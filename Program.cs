@@ -70,6 +70,7 @@ internal class Program
                 string fileName = Path.GetFileName(file);
                 log.Info($"Обработка заявки: {fileName}. Начинаю извлечение данных из заявки.");
 
+                SapfirManager sapfir = null;
                 try
                 {
                     jsonManager = new JsonManager(file, true);
@@ -207,7 +208,7 @@ internal class Program
 
                     try
                     {
-                        SapfirManager sapfir = new SapfirManager(sapLogonPath);
+                        sapfir = new SapfirManager(sapLogonPath);
                         sapfir.LaunchSAP();
                         log.Info("SAP Logon успешно запущен.");
 
@@ -932,10 +933,15 @@ internal class Program
                         log.Error(ex, "Ошибка SAP");
                         throw;
                     }
+                    finally
+                    {
+                        sapfir?.KillSAP();
+                    }
                 }
                 catch (Exception ex)
                 {
                     log.Error($"Ошибка при обработке входного файла {fileName}. Переход к следующему файлу.");
+                    sapfir?.KillSAP();
                     jsonManager.SetValue("status", "ERROR");
                     jsonManager.SetValue("message", ex.Message);
                     jsonManager.SaveToFile(file);
