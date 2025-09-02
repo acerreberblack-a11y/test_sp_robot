@@ -6,11 +6,13 @@ using System.Diagnostics;
 using System.Threading;
 using FlaUI.Core;
 using FlaUI.Core.AutomationElements;
+using NLog;
 
 namespace SpravkoBot_AsSapfir
 {
 public class SapfirManager
 {
+    private static readonly Logger log = LogManager.GetCurrentClassLogger();
     public GuiApplication SapApp { get; private set; }
     public GuiConnection SapConnection { get; private set; }
     public GuiSession SapSession { get; private set; }
@@ -133,7 +135,7 @@ public class SapfirManager
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Ошибка при получении текущей сессии: {ex.Message}");
+            log.Error(ex, "Ошибка при получении текущей сессии");
             return null;
         }
     }
