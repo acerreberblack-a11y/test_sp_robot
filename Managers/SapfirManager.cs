@@ -25,6 +25,44 @@ public class SapfirManager
                                                                               "Путь к SAP Logon не может быть null.");
     }
 
+    private T FindElement<T>(string id, bool raiseExceptionIfNotFound = true, int timeoutMs = 5000,
+                              int retryIntervalMs = 500) where T : class
+    {
+        return FindElement<T>(SapSession, id, raiseExceptionIfNotFound, timeoutMs, retryIntervalMs);
+    }
+
+    private T FindElement<T>(GuiSession session, string id, bool raiseExceptionIfNotFound = true, int timeoutMs = 5000,
+                              int retryIntervalMs = 500) where T : class
+    {
+        if (session == null)
+        {
+            if (raiseExceptionIfNotFound)
+                throw new Exception("Сессия SAP не инициализирована.");
+            return null;
+        }
+
+        var start = DateTime.Now;
+        while ((DateTime.Now - start).TotalMilliseconds < timeoutMs)
+        {
+            try
+            {
+                var component = session.FindById(id, false) as T;
+                if (component != null)
+                    return component;
+            }
+            catch
+            {
+                // игнорируем и повторяем попытку
+            }
+            Thread.Sleep(retryIntervalMs);
+        }
+
+        if (raiseExceptionIfNotFound)
+            throw new Exception($"Компонент с ID {id} не найден за отведенное время.");
+
+        return null;
+    }
+
     public void LaunchSAP()
     {
         using (var automation = new UIA3Automation())
@@ -151,10 +189,10 @@ public class SapfirManager
 
         Thread.Sleep(1000); // Ожидание для стабилизации интерфейса
         GuiMainWindow mainWindow =
-            session.FindById("wnd[0]") as GuiMainWindow ?? throw new Exception("Главное окно wnd[0] не найдено.");
-        GuiTextField userField = session.FindById("wnd[0]/usr/txtRSYST-BNAME") as GuiTextField ??
+            FindElement<GuiMainWindow>(session, "wnd[0]") ?? throw new Exception("Главное окно wnd[0] не найдено.");
+        GuiTextField userField = FindElement<GuiTextField>(session, "wnd[0]/usr/txtRSYST-BNAME") ??
                                  throw new Exception("Поле логина не найдено.");
-        GuiTextField pwdField = session.FindById("wnd[0]/usr/pwdRSYST-BCODE") as GuiTextField ??
+        GuiTextField pwdField = FindElement<GuiTextField>(session, "wnd[0]/usr/pwdRSYST-BCODE") ??
                                 throw new Exception("Поле пароля не найдено.");
 
         userField.Text = user;
@@ -172,7 +210,7 @@ public class SapfirManager
 
         try
         {
-            var mainWindow = session.FindById("wnd[0]") as GuiMainWindow ??
+            var mainWindow = FindElement<GuiMainWindow>(session, "wnd[0]") ??
                              throw new InvalidOperationException("Главное окно 'wnd[0]' не найдено.");
 
             // Выполняем команду /nex напрямую через HardCopy
@@ -186,7 +224,7 @@ public class SapfirManager
 
     public void ToolBarButton(string id)
     {
-        GuiToolbarControl toolbar = SapSession.FindById(id) as GuiToolbarControl ??
+        GuiToolbarControl toolbar = FindElement<GuiToolbarControl>(id) ??
                                     throw new Exception($"Кнопка панели инструментов с ID {id} не найдена.");
         toolbar.SetFocus();
         toolbar.PressButton(id); // Исправлено на PressButton вместо SelectMenuItem
@@ -195,7 +233,7 @@ public class SapfirManager
     public void SendKey(string id, int numberKey)
     {
         GuiFrameWindow window =
-            SapSession.FindById(id) as GuiFrameWindow ?? throw new Exception($"Окно с ID {id} не найдено.");
+            FindElement<GuiFrameWindow>(id) ?? throw new Exception($"Окно с ID {id} не найдено.");
         window.SetFocus();
         window.SendVKey(numberKey);
     }
@@ -203,7 +241,7 @@ public class SapfirManager
     public void SetText(string id, string text)
     {
         GuiComponent component =
-            SapSession.FindById(id) as GuiComponent ?? throw new Exception($"Компонент с ID {id} не найден.");
+            FindElement<GuiComponent>(id) ?? throw new Exception($"Компонент с ID {id} не найден.");
         if (component.Type == "GuiTextField" || component.Type == "GuiCTextField")
         {
             dynamic textField = component; // Динамическое приведение для поддержки обоих типов
@@ -218,7 +256,7 @@ public class SapfirManager
 
     public void GuiShellPress(string id, string context, bool raiseExceptionIfNotFound = true)
     {
-        GuiShell shell = SapSession.FindById(id, raiseExceptionIfNotFound) as GuiShell;
+        GuiShell shell = FindElement<GuiShell>(id, raiseExceptionIfNotFound);
         if (shell != null && shell.Type == "GuiGridView")
         {
             GuiGridView grid = shell as GuiGridView;
@@ -232,7 +270,7 @@ public class SapfirManager
 
     public void PressButton(string id)
     {
-        GuiButton button = SapSession.FindById(id) as GuiButton ?? throw new Exception($"Кнопка с ID {id} не найдена.");
+        GuiButton button = FindElement<GuiButton>(id) ?? throw new Exception($"Кнопка с ID {id} не найдена.");
         button.SetFocus();
         button.Press();
     }
@@ -240,7 +278,7 @@ public class SapfirManager
     public void ContextMenu(string id, string key)
     {
         GuiGridView grid =
-            SapSession.FindById(id) as GuiGridView ?? throw new Exception($"GridView с ID {id} не найден.");
+            FindElement<GuiGridView>(id) ?? throw new Exception($"GridView с ID {id} не найден.");
         grid.ContextMenu();
         grid.SelectContextMenuItem(key);
     }
@@ -248,7 +286,7 @@ public class SapfirManager
     public bool GuiCheckBox(string id, bool status)
     {
         GuiCheckBox checkbox =
-            SapSession.FindById(id) as GuiCheckBox ?? throw new Exception($"Чекбокс с ID {id} не найден.");
+            FindElement<GuiCheckBox>(id) ?? throw new Exception($"Чекбокс с ID {id} не найден.");
         checkbox.SetFocus();
         checkbox.Selected = status;
         return true;
@@ -257,7 +295,7 @@ public class SapfirManager
     public bool RadioButton(string id, bool status)
     {
         GuiRadioButton radio =
-            SapSession.FindById(id) as GuiRadioButton ?? throw new Exception($"Радиокнопка с ID {id} не найдена.");
+            FindElement<GuiRadioButton>(id) ?? throw new Exception($"Радиокнопка с ID {id} не найдена.");
         radio.SetFocus();
         radio.Selected = status;
         return true;
@@ -265,21 +303,21 @@ public class SapfirManager
 
     public string GetLabel(string id)
     {
-        GuiLabel label = SapSession.FindById(id) as GuiLabel ?? throw new Exception($"Метка с ID {id} не найдена.");
+        GuiLabel label = FindElement<GuiLabel>(id) ?? throw new Exception($"Метка с ID {id} не найдена.");
         label.SetFocus();
         return label.Text ?? string.Empty;
     }
 
     public void SelectTab(string id)
     {
-        GuiTab tab = SapSession.FindById(id) as GuiTab ?? throw new Exception($"Вкладка с ID {id} не найдена.");
+        GuiTab tab = FindElement<GuiTab>(id) ?? throw new Exception($"Вкладка с ID {id} не найдена.");
         tab.SetFocus();
         tab.Select();
     }
 
     public string ShowContextText(string id)
     {
-        GuiCTextField textField = SapSession.FindById(id) as GuiCTextField ??
+        GuiCTextField textField = FindElement<GuiCTextField>(id) ??
                                   throw new Exception($"Поле с ID {id} не найдено или не является GuiCTextField.");
         textField.SetFocus();
         string text = textField.Text;
@@ -289,14 +327,14 @@ public class SapfirManager
 
     public string GetComponentType(string id)
     {
-        GuiComponent component = SapSession.FindById(id) as GuiComponent;
+        GuiComponent component = FindElement<GuiComponent>(id, raiseExceptionIfNotFound: false);
         return component?.Type ?? string.Empty;
     }
 
     public void SetComboBox(string id, string key)
     {
         GuiComboBox combo =
-            SapSession.FindById(id) as GuiComboBox ?? throw new Exception($"Комбобокс с ID {id} не найден.");
+            FindElement<GuiComboBox>(id) ?? throw new Exception($"Комбобокс с ID {id} не найден.");
         combo.SetFocus();
         combo.Key = key; // Используем string вместо int для большей гибкости
     }
@@ -304,7 +342,7 @@ public class SapfirManager
     public void CloseFrameWindow(string id)
     {
         GuiFrameWindow window =
-            SapSession.FindById(id) as GuiFrameWindow ?? throw new Exception($"Окно с ID {id} не найдено.");
+            FindElement<GuiFrameWindow>(id) ?? throw new Exception($"Окно с ID {id} не найдено.");
         window.SetFocus();
         window.Close();
     }
@@ -323,14 +361,14 @@ public class SapfirManager
 
     public void SetVerticalScrollPosition(string tableId, int position)
     {
-        GuiTableControl table = SapSession.FindById(tableId) as GuiTableControl ??
+        GuiTableControl table = FindElement<GuiTableControl>(tableId) ??
                                 throw new Exception($"Таблица с ID {tableId} не найдена.");
         table.VerticalScrollbar.Position = position;
     }
 
     public string GetStatusMessage()
     {
-        GuiStatusbar statusbar = SapSession.FindById("wnd[0]/sbar") as GuiStatusbar;
+        GuiStatusbar statusbar = FindElement<GuiStatusbar>("wnd[0]/sbar", raiseExceptionIfNotFound: false);
         return statusbar?.Text ?? "Статус-бар не найден.";
     }
 
@@ -338,7 +376,7 @@ public class SapfirManager
     {
         if (SapSession.Children.Count > 1)
         {
-            GuiModalWindow popup = SapSession.FindById("wnd[1]") as GuiModalWindow;
+            GuiModalWindow popup = FindElement<GuiModalWindow>("wnd[1]", raiseExceptionIfNotFound: false);
             return popup?.Text ?? "Всплывающее окно не содержит текста.";
         }
         return "Нет всплывающих окон.";
@@ -351,7 +389,7 @@ public class SapfirManager
 
         for (int i = 0; i < SapSession.Children.Count; i++)
         {
-            GuiMainWindow window = SapSession.FindById($"wnd[{i}]") as GuiMainWindow;
+            GuiMainWindow window = FindElement<GuiMainWindow>($"wnd[{i}]", raiseExceptionIfNotFound: false);
             if (window != null && window.Text.Contains(windowTitle))
             {
                 return i;
@@ -363,7 +401,7 @@ public class SapfirManager
     public string GetTextFromField(string id)
     {
         GuiComponent component =
-            SapSession.FindById(id) as GuiComponent ?? throw new Exception($"Компонент с ID {id} не найден.");
+            FindElement<GuiComponent>(id) ?? throw new Exception($"Компонент с ID {id} не найден.");
         if (component.Type == "GuiCTextField" || component.Type == "GuiTextField")
         {
             dynamic textField = component;
