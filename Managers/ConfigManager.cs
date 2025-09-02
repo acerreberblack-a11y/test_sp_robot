@@ -2,62 +2,60 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace SpravkoBot_AsSapfir
 {
-    internal class ConfigManager
+internal class ConfigManager
+{
+    private static Logger log = LogManager.GetCurrentClassLogger();
+    private string _configPath;
+    public Config Config { get; private set; }
+    private JsonManager jsonManager;
+
+    // Конструктор, который принимает путь конфигурационного файла
+    public ConfigManager(string configPath)
     {
-        private static Logger log = LogManager.GetCurrentClassLogger();
-        private string _configPath;
-        public Config Config { get; private set; }
-        private JsonManager jsonManager;
+        _configPath = configPath;
+        jsonManager = new JsonManager(_configPath);
+        LoadConfig();
+    }
 
-        // Конструктор, который принимает путь конфигурационного файла
-        public ConfigManager(string configPath)
+    // Загрузка конфигурации из JSON
+    public void LoadConfig()
+    {
+        try
         {
-            _configPath = configPath;
-            jsonManager = new JsonManager(_configPath);
-            LoadConfig();
+            Config = jsonManager.GetValue<Config>("$");
+            log.Info($"Конфигурация успешно загружена: {Config.Organizations.Count} организаций.");
         }
-
-        // Загрузка конфигурации из JSON
-        public void LoadConfig()
+        catch (Exception ex)
         {
-            try
-            {
-                Config = jsonManager.GetValue<Config>("$");
-                log.Info($"Конфигурация успешно загружена: {Config.Organizations.Count} организаций.");
-            }
-            catch (Exception ex)
-            {
-                log.Error($"Ошибка загрузки конфигурации: {ex.Message}");
-                throw new Exception($"Ошибка загрузки конфигурации: {ex.Message}");
-                // Если конфигурация не загружается, сохраняем шаблон
-                /*                Config = JsonConvert.DeserializeObject<Config>(GetTemplateConfig());
-                                SaveConfig();*/
-            }
+            log.Error($"Ошибка загрузки конфигурации: {ex.Message}");
+            throw new Exception($"Ошибка загрузки конфигурации: {ex.Message}");
+            // Если конфигурация не загружается, сохраняем шаблон
+            /*                Config = JsonConvert.DeserializeObject<Config>(GetTemplateConfig());
+                            SaveConfig();*/
         }
+    }
 
-        // Сохранение конфигурации в файл
-        public void SaveConfig()
+    // Сохранение конфигурации в файл
+    public void SaveConfig()
+    {
+        try
         {
-            try
-            {
-                jsonManager.SetValue("$", Config);
-                jsonManager.SaveToFile(_configPath);
-            }
-            catch (Exception ex)
-            {
-                log.Error($"Ошибка сохранения конфигурации: {ex.Message}");
-            }
+            jsonManager.SetValue("$", Config);
+            jsonManager.SaveToFile(_configPath);
         }
-
-        // Метод для получения шаблона конфигурации
-        public static string GetTemplateConfig()
+        catch (Exception ex)
         {
-            return @"
+            log.Error($"Ошибка сохранения конфигурации: {ex.Message}");
+        }
+    }
+
+    // Метод для получения шаблона конфигурации
+    public static string GetTemplateConfig()
+    {
+        return @"
     {
       ""ApplicationPath"": ""C:\\Program Files\\1C\\1C.exe"",
       ""Organizations"": [
@@ -118,84 +116,82 @@ namespace SpravkoBot_AsSapfir
         }
       ]
     }";
+    }
+
+    // Метод для получения конфигурации базы данных организации по имени
+    public DatabaseConfig GetOrganizationConfig(string organizationName)
+    {
+        log.Info($"Ищем организацию с именем: {organizationName}");
+        var organization = Config.Organizations.FirstOrDefault(
+            o => o.Name.Equals(organizationName, StringComparison.OrdinalIgnoreCase));
+
+        if (organization != null)
+        {
+            log.Info($"Организация с именем {organizationName} найдена.");
+            return organization.Database;
         }
 
-        // Метод для получения конфигурации базы данных организации по имени
-        public DatabaseConfig GetOrganizationConfig(string organizationName)
+        log.Error($"Организация с именем {organizationName} не найдена в конфигурации.");
+        return null;
+    }
+
+    // Метод для получения филиалов и подписантов по организации
+    public Dictionary<string, List<(string FullName, string Alias)>> GetBranchesAndSigners(string organizationName)
+    {
+        var organization = Config.Organizations.FirstOrDefault(
+            o => o.Name.Equals(organizationName, StringComparison.OrdinalIgnoreCase));
+
+        if (organization == null)
         {
-            log.Info($"Ищем организацию с именем: {organizationName}");
-            var organization = Config.Organizations
-                .FirstOrDefault(o => o.Name.Equals(organizationName, StringComparison.OrdinalIgnoreCase));
-
-            if (organization != null)
-            {
-                log.Info($"Организация с именем {organizationName} найдена.");
-                return organization.Database;
-            }
-
             log.Error($"Организация с именем {organizationName} не найдена в конфигурации.");
             return null;
         }
 
-        // Метод для получения филиалов и подписантов по организации
-        public Dictionary<string, List<(string FullName, string Alias)>> GetBranchesAndSigners(string organizationName)
+        var branchesInfo = new Dictionary<string, List<(string FullName, string Alias)>>();
+
+        foreach (var branch in organization.Branches)
         {
-            var organization = Config.Organizations
-                .FirstOrDefault(o => o.Name.Equals(organizationName, StringComparison.OrdinalIgnoreCase));
+            var signersList = branch.Signers.Select(s => (s.FullName, s.Alias)).ToList();
 
-            if (organization == null)
-            {
-                log.Error($"Организация с именем {organizationName} не найдена в конфигурации.");
-                return null;
-            }
-
-            var branchesInfo = new Dictionary<string, List<(string FullName, string Alias)>>();
-
-            foreach (var branch in organization.Branches)
-            {
-                var signersList = branch.Signers
-                    .Select(s => (s.FullName, s.Alias))
-                    .ToList();
-
-                branchesInfo[branch.Name] = signersList;
-            }
-
-            return branchesInfo;
+            branchesInfo[branch.Name] = signersList;
         }
-    }
 
-    // Классы для хранения конфигурационных данных
-    public class Config
-    {
-        public string ApplicationPath { get; set; }
-        public List<Organization> Organizations { get; set; } = new List<Organization>();
+        return branchesInfo;
     }
+}
 
-    public class Organization
-    {
-        public string Name { get; set; }
-        public DatabaseConfig Database { get; set; }
-        public List<Branch> Branches { get; set; } = new List<Branch>();
-    }
+// Классы для хранения конфигурационных данных
+public class Config
+{
+    public string ApplicationPath { get; set; }
+    public List<Organization> Organizations { get; set; } = new List<Organization>();
+}
 
-    public class DatabaseConfig
-    {
-        public string Host { get; set; }
-        public int Port { get; set; }
-        public string Username { get; set; }
-        public string Password { get; set; }
-        public string DatabaseName { get; set; }
-    }
+public class Organization
+{
+    public string Name { get; set; }
+    public DatabaseConfig Database { get; set; }
+    public List<Branch> Branches { get; set; } = new List<Branch>();
+}
 
-    public class Branch
-    {
-        public string Name { get; set; }
-        public List<Signer> Signers { get; set; } = new List<Signer>();
-    }
+public class DatabaseConfig
+{
+    public string Host { get; set; }
+    public int Port { get; set; }
+    public string Username { get; set; }
+    public string Password { get; set; }
+    public string DatabaseName { get; set; }
+}
 
-    public class Signer
-    {
-        public string FullName { get; set; }
-        public string Alias { get; set; }
-    }
+public class Branch
+{
+    public string Name { get; set; }
+    public List<Signer> Signers { get; set; } = new List<Signer>();
+}
+
+public class Signer
+{
+    public string FullName { get; set; }
+    public string Alias { get; set; }
+}
 }
