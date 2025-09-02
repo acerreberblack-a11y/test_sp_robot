@@ -8,6 +8,7 @@ namespace SpravkoBot_AsSapfir
 {
 internal class LoggerManager
 {
+    private static readonly Logger log = LogManager.GetCurrentClassLogger();
     private readonly string _logPath;
     private readonly int _daysToKeepLogs;
 
@@ -35,7 +36,7 @@ internal class LoggerManager
         }
         catch (Exception ex)
         {
-            Console.WriteLine(ex.Message);
+            log.Error(ex, "Ошибка при настройке логгера");
             throw new InvalidOperationException("Ошибка при настройке логгера", ex);
         }
     }
@@ -47,7 +48,7 @@ internal class LoggerManager
         {
             if (!Directory.Exists(_logPath))
             {
-                Console.WriteLine($"Папка {_logPath} не существует. Невозможно очистить логи.");
+                log.Warn($"Папка {_logPath} не существует. Невозможно очистить логи.");
                 return;
             }
 
@@ -60,14 +61,14 @@ internal class LoggerManager
                 if (fileInfo.LastWriteTime < cutoffDate)
                 {
                     fileInfo.Delete();
-                    Console.WriteLine(
+                    log.Info(
                         $"Удаление старого лога: {fileInfo.Name} ({fileInfo.Length} байт) Последнее изменение: {fileInfo.LastWriteTime}");
                 }
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Ошибка при удалении старых логов: {ex.Message}");
+            log.Error(ex, "Ошибка при удалении старых логов");
         }
     }
 }

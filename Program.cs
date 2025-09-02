@@ -114,7 +114,7 @@ internal class Program
                         throw new FileNotFoundException("CSV-файл не найден!", csvPath);
                     }
 
-                    Console.WriteLine(
+                    log.Info(
                         $"Выполняю фильтрацию по параметрам из заявки: БЕ:{requestManager.RequestBE}, ИНН:{requestManager.INN}, КПП:{requestManager.KPP}");
                     var searchNames = new HashSet<string> { requestManager.RequestBE.ToString() };
                     var searchInn = new HashSet<string> { requestManager.INN.ToString() };
@@ -158,7 +158,7 @@ internal class Program
 
                     foreach (var row in filteredRows)
                     {
-                        Console.WriteLine(string.Join(" | ", row));
+                        log.Debug(string.Join(" | ", row));
                     }
 
                     string id = filteredRows.FirstOrDefault()?.Number ?? "";
@@ -197,12 +197,12 @@ internal class Program
                         signatory1 = signatories[0].Trim();
                         signatory2 = signatories.Length > 1 ? signatories[1].Trim() : signatory1;
 
-                        Console.WriteLine(
+                        log.Info(
                             $"Выбраны подписанты: Подписант 1 — {signatory1}, Подписант 2 — {signatory2}");
                     }
                     else
                     {
-                        Console.WriteLine("Значение personnelNumber пустое или null.");
+                        log.Warn("Значение personnelNumber пустое или null.");
                     }
 
                     try
@@ -620,7 +620,7 @@ internal class Program
 
                         statusBarValue = sapfir.GetStatusMessage();
 
-                        Console.WriteLine(statusBarValue);
+                        log.Info($"Статус SAP: {statusBarValue}");
 
                         // Фильтр на ошибки
 
@@ -929,7 +929,7 @@ internal class Program
                     catch (Exception ex)
                     {
 
-                        Console.WriteLine($"Ошибка SAP: {ex.Message}");
+                        log.Error(ex, "Ошибка SAP");
                         throw;
                     }
                 }

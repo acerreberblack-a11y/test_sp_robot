@@ -3,11 +3,13 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using NLog;
 
 namespace SpravkoBot_AsSapfir
 {
 public class ExcelConverter
 {
+    private static readonly Logger log = LogManager.GetCurrentClassLogger();
     private const string DefaultPassword = "1234";
     private readonly string excelPath;
 
@@ -20,6 +22,8 @@ public class ExcelConverter
 
     public string ConvertToCsv()
     {
+        log.Info($"Начало конвертации файла Excel '{excelPath}' в CSV.");
+
         if (string.IsNullOrEmpty(excelPath))
         {
             throw new ArgumentException("Путь к файлу не может быть пустым", nameof(excelPath));
@@ -47,11 +51,13 @@ public class ExcelConverter
                 SaveAsCsv(worksheet, csvPath);
             }
 
+            log.Info($"Файл успешно конвертирован в CSV: {csvPath}");
             // TryDeleteExcelFile();
             return csvPath;
         }
         catch (Exception ex)
         {
+            log.Error(ex, "Ошибка при конвертации Excel в CSV");
             throw new Exception($"Ошибка при конвертации Excel в CSV: {ex.Message}", ex);
         }
     }
@@ -65,7 +71,7 @@ public class ExcelConverter
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Ошибка при открытии файла: {ex.Message}");
+            log.Error(ex, "Ошибка при открытии Excel-файла");
             throw;
         }
     }
@@ -83,6 +89,7 @@ public class ExcelConverter
         }
         catch (Exception ex)
         {
+            log.Error(ex, "Ошибка при подготовке листа Excel");
             throw new Exception($"Ошибка при подготовке листа: {ex.Message}", ex);
         }
     }
@@ -128,10 +135,11 @@ public class ExcelConverter
             }
 
             File.WriteAllText(csvPath, csvBuilder.ToString(), Encoding.UTF8);
-            Console.WriteLine($"Сохранено как CSV: {csvPath}");
+            log.Info($"Сохранено как CSV: {csvPath}. Строк: {rowCount}, столбцов: {colCount}");
         }
         catch (Exception ex)
         {
+            log.Error(ex, "Ошибка при сохранении CSV-файла");
             throw new Exception($"Ошибка при сохранении CSV: {ex.Message}", ex);
         }
     }
@@ -143,12 +151,12 @@ public class ExcelConverter
             if (File.Exists(excelPath))
             {
                 File.Delete(excelPath);
-                Console.WriteLine($"Исходный файл {excelPath} удален.");
+                log.Info($"Исходный файл {excelPath} удален.");
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Не удалось удалить Excel-файл: {ex.Message}");
+            log.Warn(ex, "Не удалось удалить Excel-файл");
         }
     }
 }
