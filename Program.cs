@@ -18,6 +18,7 @@ internal class Program
     private static JsonManager jsonManager;
     private static ConfigManager configManager;
     private static Dictionary<string, string> appFolders;
+    private static Dictionary<string, string> beCodes;
 
     private static string signatory1 = string.Empty;
     private static string signatory2 = string.Empty;
@@ -37,6 +38,14 @@ internal class Program
 
             string configPath = initializer.GetPathConfigFile();
             configManager = new ConfigManager(configPath);
+            var config = configManager.Config;
+            string excelPath = config.ExcelPath;
+            string sapLogonPath = config.SapLogonPath;
+            string stage = config.SapStage;
+            string testStage = config.SapTestStage;
+            string sapUser = config.SapUser;
+            string sapPassword = config.SapPassword;
+            beCodes = config.BeCodes;
 
             if (!appFolders.TryGetValue("input", out string inputFolder) || string.IsNullOrWhiteSpace(inputFolder))
             {
@@ -96,8 +105,6 @@ internal class Program
                     jsonManager = new JsonManager(jsonFile, true);
                     requestManager = RequestManager.FromJson(jsonManager);
 
-                    string excelPath = @"C:\Users\RobinSapAC\Desktop\02-04-2025\SpravkoBot_" +
-                                       @"AsSapfir\bin\Debug\KA\Реестр по всем БЕ.xlsx";
                     log.Info($"Начинаю конвертирование excel файла в csv: {excelPath}");
                     var converter = new ExcelConverter(excelPath);
                     string csvPath = converter.ConvertToCsv();
@@ -198,7 +205,6 @@ internal class Program
                         Console.WriteLine("Значение personnelNumber пустое или null.");
                     }
 
-                    string sapLogonPath = @"C:\Program Files (x86)\SAP\FrontEnd\SapGui\saplogon.exe";
                     try
                     {
                         SapfirManager sapfir = new SapfirManager(sapLogonPath);
@@ -207,7 +213,6 @@ internal class Program
 
                         // 1. Продуктивная среда САПФИР
                         // ER2 - среда тестирования САПФИР
-                        string stage = "1. Продуктивная среда САПФИР";
                         GuiSession session = sapfir.GetSapSession(stage);
                         if (session == null)
                         {
@@ -215,9 +220,9 @@ internal class Program
                         }
                         log.Info("Сессия SAP успешно получена.");
 
-                        if (stage == "ER2 - среда тестирования САПФИР")
+                        if (stage == testStage)
                         {
-                            sapfir.LoginToSAP(session, "DIADOC_INT", "1Sdfghjkl12345^&2");
+                            sapfir.LoginToSAP(session, sapUser, sapPassword);
                         }
                         string statusBarValue = sapfir.GetStatusMessage();
 
@@ -949,31 +954,7 @@ internal class Program
 
     static string GetValueByName(string name)
     {
-        var nameValue =
-            new Dictionary<string, string> { { "Бурейская ГЭС", "1030" },
-                                             { "Исполнительный аппарат", "1010" },
-                                             { "Волжская ГЭС", "1050" },
-                                             { "Воткинская ГЭС", "1060" },
-                                             { "Дагестанский филиал", "1080" },
-                                             { "Жигулевская ГЭС", "1090" },
-                                             { "Загорская ГАЭС", "1100" },
-                                             { "Зейская ГЭС", "1140" },
-                                             { "Кабардино-Балкарский филиал", "1170" },
-                                             { "Камская ГЭС", "1180" },
-                                             { "Каскад Верхневолжских ГЭС", "1200" },
-                                             { "Каскад Кубанских ГЭС", "1210" },
-                                             { "Нижегородская ГЭС", "1240" },
-                                             { "Новосибирская ГЭС", "1260" },
-                                             { "Саратовская ГЭС", "1300" },
-                                             { "Северо-Осетинский филиал", "1320" },
-                                             { "Чебоксарская ГЭС", "1350" },
-                                             { "КорУнГ", "1410" },
-                                             { "Хабаровский филиал", "1510" },
-                                             { "Приморский филиал", "1520" },
-                                             { "Якутский филиал", "1530" },
-                                             { "Карачаево-Черкесский филиал", "1190" },
-                                             { "Саяно-Шушенская ГЭС (СШГЭС им. П.С. Непорожнего)", "1310" } };
-        return nameValue.TryGetValue(name, out string value) ? value : null;
+        return beCodes != null && beCodes.TryGetValue(name, out string value) ? value : null;
     }
 
     static string CreateRequestFolder(string UUIDRequest, string pathRootFolder, string pathJsonFileRequest)

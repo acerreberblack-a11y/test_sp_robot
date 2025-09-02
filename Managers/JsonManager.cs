@@ -26,12 +26,12 @@ internal class JsonManager
                 }
 
                 var json = File.ReadAllText(filePath);
-                _jsonObject = JObject.Parse(json);
+                _jsonObject = JObject.Parse(json, new JsonLoadSettings { CommentHandling = CommentHandling.Ignore });
             }
             else
             {
                 // Считываем JSON строку
-                _jsonObject = JObject.Parse(filePath);
+                _jsonObject = JObject.Parse(filePath, new JsonLoadSettings { CommentHandling = CommentHandling.Ignore });
             }
         }
         catch (Exception ex)
