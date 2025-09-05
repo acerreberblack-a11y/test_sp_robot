@@ -1,29 +1,16 @@
-﻿
 using NLog;
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace SpravkoBot_AsSapfir
 {
-internal class RequestManager
+internal static class RequestManager
 {
     private static Logger log = LogManager.GetCurrentClassLogger();
 
-    public string RequestType { get; set; }
-    public string RequestBE { get; set; }
-    public string RequestUUID { get; set; }
-    public DateTime DateStart { get; set; }
-    public DateTime DateEnd { get; set; }
-    public string INN { get; set; }
-    public string KPP { get; set; }
-    public string Service { get; set; }
-    public string Organization { get; set; }
-    public string AgreementNumber { get; set; }
-    public string message { get; set; }
-    public string status { get; set; }
-
-    public static RequestManager FromJson(JsonManager jsonManager)
+    public static Request FromJson(JsonManager jsonManager)
     {
         try
         {
@@ -36,7 +23,8 @@ internal class RequestManager
             string INN = jsonManager.GetValue<string>("innString");
             string KPP = jsonManager.GetValue<string>("kppString");
             string Service = jsonManager.GetValue<string>("service.title");
-            string AgreementNumber = jsonManager.GetValue<string>("regNumbDoc");
+            var AgreementNumbers = jsonManager.GetValue<List<string>>("regNumbDoc");
+            var CounterpartyNumbers = jsonManager.GetValue<List<string>>("contragent");
             string status = jsonManager.GetValue<string>("status");
             string message = jsonManager.GetValue<string>("message");
 
@@ -52,18 +40,19 @@ internal class RequestManager
                 jsonManager.AddKey("message", null);
             }
 
-            return new RequestManager { RequestUUID = RequestUUID,
-                                        RequestType = RequestType,
-                                        RequestBE = RequestBE,
-                                        Organization = Organization,
-                                        DateStart = DateStart,
-                                        DateEnd = DateEnd,
-                                        INN = INN,
-                                        KPP = KPP,
-                                        Service = Service,
-                                        AgreementNumber = AgreementNumber,
-                                        status = status,
-                                        message = message };
+            return new Request { RequestUUID = RequestUUID,
+                                 RequestType = RequestType,
+                                 RequestBE = RequestBE,
+                                 Organization = Organization,
+                                 DateStart = DateStart,
+                                 DateEnd = DateEnd,
+                                 INN = INN,
+                                 KPP = KPP,
+                                 Service = Service,
+                                 AgreementNumbers = AgreementNumbers,
+                                 CounterpartyNumbers = CounterpartyNumbers,
+                                 status = status,
+                                 message = message };
         }
         catch (Exception ex)
         {
