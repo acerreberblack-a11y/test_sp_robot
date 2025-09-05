@@ -132,6 +132,7 @@
     <Compile Include="Managers\RequestManager.cs" />
     <Compile Include="Managers\SapfirManager.cs" />
     <Compile Include="_obj\Request.cs" />
+    <Compile Include="_obj\SapTask.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

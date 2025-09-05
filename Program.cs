@@ -74,27 +74,28 @@ internal class Program
                 try
                 {
                     jsonManager = new JsonManager(file, true);
-                    RequestManager requestManager = RequestManager.FromJson(jsonManager);
+                    Request request = RequestManager.FromJson(jsonManager);
+                    log.Info($"Для заявки {request.RequestUUID} создана сущность Request.");
 
                     log.Info("Данные из заявки извлечены:");
                     log.Info("********************************************");
-                    log.Info($"* Номер заявки => {requestManager.RequestUUID}");
-                    log.Info($"* Тип заявки => {requestManager.RequestType}");
-                    log.Info($"* Услуга => {requestManager.Service}");
-                    log.Info($"* Организация => {requestManager.Organization}");
+                    log.Info($"* Номер заявки => {request.RequestUUID}");
+                    log.Info($"* Тип заявки => {request.RequestType}");
+                    log.Info($"* Услуга => {request.Service}");
+                    log.Info($"* Организация => {request.Organization}");
                     log.Info($"*..........................................*");
-                    log.Info($"* БЕ => {requestManager.RequestBE}");
-                    log.Info($"* ИНН => {requestManager.INN}");
-                    log.Info($"* КПП => {requestManager.KPP}");
-                    log.Info($"* Номер (-а) договора в системе => {requestManager.AgreementNumber}");
-                    log.Info($"* Начало периода => {requestManager.DateStart:dd.MM.yyyy}");
-                    log.Info($"* Конец периода => {requestManager.DateEnd:dd.MM.yyyy}");
+                    log.Info($"* БЕ => {request.RequestBE}");
+                    log.Info($"* ИНН => {request.INN}");
+                    log.Info($"* КПП => {request.KPP}");
+                    log.Info($"* Номер (-а) договора в системе => {string.Join(", ", request.AgreementNumbers ?? new List<string>())}");
+                    log.Info($"* Начало периода => {request.DateStart:dd.MM.yyyy}");
+                    log.Info($"* Конец периода => {request.DateEnd:dd.MM.yyyy}");
                     log.Info("**********************************************");
 
                     string folderRequest = "";
                     if (appFolders.TryGetValue("output", out string outputFolder))
                     {
-                        folderRequest = CreateRequestFolder(requestManager.RequestUUID, outputFolder, file);
+                        folderRequest = CreateRequestFolder(request.RequestUUID, outputFolder, file);
                     }
                     else
                     {
@@ -102,9 +103,9 @@ internal class Program
                         throw new Exception("Не удалось получить путь к папке output.");
                     }
 
-                    string jsonFile = Path.Combine(folderRequest, $"{requestManager.RequestUUID}+.txt");
+                    string jsonFile = Path.Combine(folderRequest, $"{request.RequestUUID}+.txt");
                     jsonManager = new JsonManager(jsonFile, true);
-                    requestManager = RequestManager.FromJson(jsonManager);
+                    request = RequestManager.FromJson(jsonManager);
 
                     log.Info($"Начинаю конвертирование excel файла в csv: {excelPath}");
                     var converter = new ExcelConverter(excelPath);
@@ -116,10 +117,10 @@ internal class Program
                     }
 
                     log.Info(
-                        $"Выполняю фильтрацию по параметрам из заявки: БЕ:{requestManager.RequestBE}, ИНН:{requestManager.INN}, КПП:{requestManager.KPP}");
-                    var searchNames = new HashSet<string> { requestManager.RequestBE.ToString() };
-                    var searchInn = new HashSet<string> { requestManager.INN.ToString() };
-                    var searchKpp = new HashSet<string> { requestManager.KPP.ToString() };
+                        $"Выполняю фильтрацию по параметрам из заявки: БЕ:{request.RequestBE}, ИНН:{request.INN}, КПП:{request.KPP}");
+                    var searchNames = new HashSet<string> { request.RequestBE.ToString() };
+                    var searchInn = new HashSet<string> { request.INN.ToString() };
+                    var searchKpp = new HashSet<string> { request.KPP.ToString() };
 
                     var filteredRows =
                         File.ReadLines(csvPath)
@@ -190,6 +191,27 @@ internal class Program
                     log.Info($"Табельный номер подписантов: {personnelNumber}");
                     log.Info("********************************************");
 
+                    // После фильтрации CSV добавляем номера договоров и контрагентов
+                    request.CounterpartyNumbers = new List<string> { companyNumberSap };
+                    foreach (var agreement in request.AgreementNumbers ?? new List<string>())
+                    {
+                        foreach (var counterparty in request.CounterpartyNumbers)
+                        {
+                            request.TaskQueue.Enqueue(new SapTask
+                            {
+                                Organization = request.Organization,
+                                BeCode = request.RequestBE,
+                                INN = request.INN,
+                                KPP = request.KPP,
+                                AgreementNumbers = new List<string> { agreement },
+                                CounterpartyNumbers = new List<string> { counterparty },
+                                DateStart = request.DateStart,
+                                DateEnd = request.DateEnd
+                            });
+                        }
+                    }
+                    log.Info($"Для заявки {request.RequestUUID} создана очередь задач после фильтрации CSV.");
+
                     if (!string.IsNullOrWhiteSpace(personnelNumber))
                     {
                         string[] signatories =
@@ -254,7 +276,7 @@ internal class Program
                         log.Info("Успешно выполнен вход и запущена транзакция ZTSF_AKT_SVERKI");
 
                         string be =
-                            GetValueByName(requestManager.RequestBE) ??
+                            GetValueByName(request.RequestBE) ??
                             throw new Exception(
                                 "Не смог сопоставить БЕ с заявки из списка БЕ в конфиге, так как она отсутствует");
 
@@ -268,9 +290,9 @@ internal class Program
 
                         sapfir.SetText("wnd[0]/usr/ctxtP_BUKRS", be);
                         Thread.Sleep(500);
-                        sapfir.SetText("wnd[0]/usr/ctxtS_BUDAT-LOW", requestManager.DateStart.ToString("dd.MM.yyyy"));
+                        sapfir.SetText("wnd[0]/usr/ctxtS_BUDAT-LOW", request.DateStart.ToString("dd.MM.yyyy"));
                         Thread.Sleep(500);
-                        sapfir.SetText("wnd[0]/usr/ctxtS_BUDAT-HIGH", requestManager.DateEnd.ToString("dd.MM.yyyy"));
+                        sapfir.SetText("wnd[0]/usr/ctxtS_BUDAT-HIGH", request.DateEnd.ToString("dd.MM.yyyy"));
 
                         Thread.Sleep(1000);
                         sapfir.RadioButton("wnd[0]/usr/radP_PROCH", true);
@@ -440,7 +462,7 @@ internal class Program
                         sapfir.PressButton("wnd[1]/tbar[0]/btn[8]");
                         Thread.Sleep(2000);
 
-                        string serviceType = requestManager.RequestType.ToString();
+                        string serviceType = request.RequestType.ToString();
 
                         if (serviceType == "По одному контрагенту по всем договорам")
                         {
@@ -448,18 +470,11 @@ internal class Program
                             sapfir.GuiCheckBox("wnd[0]/usr/chkP_PRALL", true);
                         }
 
-                        string agreementNumber = requestManager.AgreementNumber;
-
                         if (serviceType == "По одному договору")
                         {
                             sapfir.GuiCheckBox("wnd[0]/usr/chkP_PRALL", false);
 
-                            string[] agreementNumbers =
-                                requestManager.AgreementNumber
-                                    ?.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
-                                    .Select(n => n.Trim())
-                                    .ToArray() ??
-                                Array.Empty<string>();
+                            var agreementNumbers = request.AgreementNumbers ?? new List<string>();
 
                             sapfir.PressButton("wnd[0]/usr/btn%_S_ZUONR_%_APP_%-VALU_PUSH");
                             Thread.Sleep(2000);
@@ -699,7 +714,7 @@ internal class Program
                             // Добавляем логику сохранения файла
                             savePath = @"C:\Users\RobinSapAC\Desktop"; // Путь к папке Desktop
                             // string fileNameToSave =
-                            // $"AktSverki_{requestManager.RequestBE}_{DateTime.Now:yyyyMMdd_HHmmss}.pdf"; // Пример
+                            // $"AktSverki_{request.RequestBE}_{DateTime.Now:yyyyMMdd_HHmmss}.pdf"; // Пример
                             // имени файла
                             string fullPath = Path.Combine(savePath);
 
